@@ -621,17 +621,19 @@
                 return;
             }
 
-            try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST', // Usamos POST para añadir y actualizar (el PHP lo diferenciará)
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        action: isUpdating ? 'update' : 'add', // Acción para el PHP
-                        meeting: meetingData
-                    })
-                });
+try {
+    const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+            // 'Content-Type': 'application/json', // <-- LÍNEA ANTERIOR
+            'Content-Type': 'text/plain;charset=utf-8', // <-- ¡NUEVA LÍNEA!
+        },
+        // El body sigue siendo JSON stringificado, ¡eso está bien!
+        body: JSON.stringify({
+            action: isUpdating ? 'update' : 'add',
+            meeting: meetingData
+        })
+    });
 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({ message: 'Error desconocido' }));
