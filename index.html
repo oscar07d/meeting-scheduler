@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Organizador de Reuniones</title>
+    <style>
+        /* --- CSS --- */
+        :root {
+            --primary-color: #4a90e2;
+            --secondary-color: #f5f5f5;
+            --border-color: #ddd;
+            --text-color: #333;
+            --header-bg: #f8f9fa;
+            --day-hover: #e9e9e9;
+            --meeting-indicator: #e84a5f;
+            --modal-bg: rgba(0, 0, 0, 0.6);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--secondary-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1, h2 {
+            color: var(--primary-color);
+            text-align: center;
+        }
+
+        .calendar-container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap; /* Para pantallas pequeñas */
+            justify-content: center;
+            width: 100%;
+            max-width: 1200px; /* Ajusta según necesites */
+        }
+
+        .calendar {
+            background-color: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            padding: 15px;
+            width: calc(50% - 35px); /* Dos calendarios lado a lado, con espacio */
+            min-width: 350px; /* Mínimo ancho para calendarios */
+        }
+
+        .calendar-header {
+            display: flex;
+            justify-content: center; /* Centrado, sin botones de navegación */
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .calendar-header h3 {
+            margin: 0;
+            font-size: 1.4em;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+        }
+
+        .day-header, .day-cell {
+            text-align: center;
+            padding: 8px 5px;
+            font-size: 0.9em;
+            min-height: 60px; /* Altura mínima para celdas */
+            position: relative; /* Para indicadores */
+        }
+
+        .day-header {
+            font-weight: bold;
+            color: var(--primary-color);
+            background-color: var(--header-bg);
+            border-radius: 4px;
+            padding: 10px 5px;
+        }
+
+        .day-cell {
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start; /* Número arriba */
+        }
+
+        .day-cell:hover {
+            background-color: var(--day-hover);
+        }
+
+        .day-number {
+            font-weight: bold;
+            margin-bottom: 5px;
+            align-self: flex-start; /* Número a la izquierda */
+            padding-left: 5px;
+        }
+
+        .other-month {
+            color: #aaa;
+            background-color: #f9f9f9;
+            cursor: default;
+        }
+        .other-month:hover {
+             background-color: #f9f9f9;
+        }
+
+        .meeting-indicator {
+            width: 8px;
+            height: 8px;
+            background-color: var(--meeting-indicator);
+            border-radius: 50%;
+            margin-top: 4px;
+        }
+        .meetings-list-inline {
+            font-size: 0.7em;
+            text-align: left;
+            padding-left: 5px;
+            width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            margin-top: 2px;
+            color: #555;
+        }
+
+
+        /* --- Modal Styles --- */
+        .modal {
+            display: none; /* Oculto por defecto */
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: var(--modal-bg);
+            padding-top: 60px; /* Espacio desde arriba */
+        }
+
+        .modal-content {
+            background-color: #fff;
+            margin: 5% auto;
+            padding: 25px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 550px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            position: relative;
+        }
+
+        .close-button {
+            color: #aaa;
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close-button:hover,
+        .close-button:focus {
+            color: #555;
+            text-decoration: none;
+        }
+
+        .modal h2 {
+            margin-top: 0;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+
+        #meetings-list li {
+            border-bottom: 1px dashed var(--border-color);
+            padding: 10px 0;
+            margin-bottom: 10px;
+            list-style: none;
+            cursor: pointer;
+        }
+         #meetings-list li:last-child {
+             border-bottom: none;
+             margin-bottom: 0;
+         }
+
+        #meetings-list li strong {
+            display: block;
+            font-size: 1.1em;
+            color: var(--primary-color);
+            margin-bottom: 5px;
+        }
+        #meetings-list li span { display: block; margin-bottom: 3px; word-break: break-all; }
+        #meetings-list li .meeting-responsible { font-style: italic; color: #666; }
+        #meetings-list li .meeting-link a { color: #007bff; text-decoration: none; }
+        #meetings-list li .meeting-link a:hover { text-decoration: underline; }
+        #meetings-list li .meeting-actions button {
+            margin-left: 10px;
+            padding: 3px 8px;
+            font-size: 0.8em;
+            cursor: pointer;
+        }
+        .delete-button { background-color: #dc3545; color: white; border: none; border-radius: 3px;}
+
+
+        #meeting-form label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        #meeting-form input[type="text"],
+        #meeting-form input[type="url"] {
+            width: calc(100% - 22px); /* Ajuste por padding y borde */
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 1em;
+        }
+         #meeting-form textarea { /* Para responsables múltiples si lo prefieres */
+            width: calc(100% - 22px);
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 1em;
+            min-height: 60px;
+            resize: vertical;
+         }
+
+
+        #meeting-form button {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.2s ease;
+        }
+
+        #meeting-form button:hover {
+            opacity: 0.9;
+        }
+
+        #add-new-meeting-btn {
+             background-color: #28a745; /* Verde */
+             color: white;
+             padding: 10px 15px;
+             border: none;
+             border-radius: 5px;
+             cursor: pointer;
+             font-size: 1em;
+             margin-top: 20px; /* Espacio después de la lista */
+         }
+         #add-new-meeting-btn:hover {
+             opacity: 0.9;
+         }
+
+         /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .calendar-container {
+                flex-direction: column;
+                align-items: center;
+            }
+            .calendar {
+                width: 90%;
+                min-width: unset;
+                margin-bottom: 20px; /* Espacio entre calendarios apilados */
+            }
+             .calendar:last-child {
+                 margin-bottom: 0;
+             }
+            .modal-content {
+                width: 90%;
+            }
+        }
+
+
+    </style>
+</head>
+<body>
+
+    <h1>Organizador de Reuniones</h1>
+
+    <div class="calendar-container">
+        <div class="calendar" id="calendar-2025-04">
+            <div class="calendar-header">
+                <h3 id="month-year-apr">Abril 2025</h3>
+            </div>
+            <div class="calendar-grid" id="grid-apr">
+                <div class="day-header">Dom</div>
+                <div class="day-header">Lun</div>
+                <div class="day-header">Mar</div>
+                <div class="day-header">Mié</div>
+                <div class="day-header">Jue</div>
+                <div class="day-header">Vie</div>
+                <div class="day-header">Sáb</div>
+                <!-- Las celdas de los días se generarán con JS -->
+            </div>
+        </div>
+
+        <div class="calendar" id="calendar-2025-05">
+             <div class="calendar-header">
+                <h3 id="month-year-may">Mayo 2025</h3>
+            </div>
+            <div class="calendar-grid" id="grid-may">
+                 <div class="day-header">Dom</div>
+                <div class="day-header">Lun</div>
+                <div class="day-header">Mar</div>
+                <div class="day-header">Mié</div>
+                <div class="day-header">Jue</div>
+                <div class="day-header">Vie</div>
+                <div class="day-header">Sáb</div>
+                <!-- Las celdas de los días se generarán con JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- El Modal para ver/añadir/editar reuniones -->
+    <div id="meetingModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeModal()">×</span>
+            <h2 id="modal-title">Reuniones del Día</h2>
+            <div id="modal-date-display" style="font-weight: bold; margin-bottom: 15px;"></div>
+
+            <div id="meetings-list-container">
+                <h4>Reuniones Programadas:</h4>
+                <ul id="meetings-list">
+                    <!-- Las reuniones existentes se listarán aquí -->
+                    <li id="no-meetings" style="display: none; font-style: italic; color: #888; border: none;">No hay reuniones para este día.</li>
+                </ul>
+            </div>
+
+            <button id="add-new-meeting-btn" onclick="showAddForm()">+ Añadir Nueva Reunión</button>
+
+            <div id="meeting-form-container" style="display: none; margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px;">
+                <h4 id="form-title">Añadir/Editar Reunión</h4>
+                <form id="meeting-form">
+                    <input type="hidden" id="meeting-id"> <!-- Para saber si estamos editando -->
+                    <input type="hidden" id="meeting-date">
+
+                    <label for="meeting-name">Tema de la Reunión:</label>
+                    <input type="text" id="meeting-name" name="name" required>
+
+                    <label for="meeting-link">Enlace de la Reunión (Opcional):</label>
+                    <input type="url" id="meeting-link" name="link">
+
+                    <label for="meeting-responsible">Responsable(s) (separados por coma):</label>
+                    <input type="text" id="meeting-responsible" name="responsible" required>
+                    <!-- O podrías usar un <textarea> si prefieres -->
+                    <!-- <textarea id="meeting-responsible" name="responsible" required></textarea> -->
+
+
+                    <button type="submit">Guardar Reunión</button>
+                    <button type="button" onclick="hideForm()" style="background-color: #6c757d; margin-left: 10px;">Cancelar</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- JavaScript ---
+        const apiUrl = 'api.php'; // Nombre de tu archivo PHP
+        const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+        let allMeetings = []; // Almacenará todas las reuniones cargadas
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadInitialData();
+        });
+
+        async function loadInitialData() {
+            await fetchMeetings(); // Carga las reuniones primero
+            renderCalendar(2025, 3, 'grid-apr'); // Abril (mes 3 porque JS es 0-indexado)
+            renderCalendar(2025, 4, 'grid-may'); // Mayo (mes 4)
+        }
+
+        async function fetchMeetings() {
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                allMeetings = await response.json();
+                // Asegurarse de que sea un array
+                 if (!Array.isArray(allMeetings)) {
+                     console.warn("La respuesta de la API no fue un array, inicializando a vacío:", allMeetings);
+                     allMeetings = [];
+                 }
+            } catch (error) {
+                console.error("Error al cargar reuniones:", error);
+                allMeetings = []; // Asegura que sea un array en caso de error
+                alert("No se pudieron cargar las reuniones existentes. Verifica la conexión con el servidor o el archivo 'meetings.json'.");
+            }
+        }
+
+        function renderCalendar(year, month, gridId) {
+            const grid = document.getElementById(gridId);
+            // Limpiar grid anterior excepto los encabezados de día
+            while (grid.children.length > 7) {
+                 grid.removeChild(grid.lastChild);
+             }
+
+
+            const firstDayOfMonth = new Date(year, month, 1).getDay(); // 0=Dom, 1=Lun,...
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            // Rellenar días del mes anterior (si es necesario)
+            const daysInPrevMonth = new Date(year, month, 0).getDate();
+            for (let i = 0; i < firstDayOfMonth; i++) {
+                const dayCell = document.createElement('div');
+                dayCell.classList.add('day-cell', 'other-month');
+                dayCell.innerHTML = `<span class="day-number">${daysInPrevMonth - firstDayOfMonth + 1 + i}</span>`;
+                grid.appendChild(dayCell);
+            }
+
+            // Rellenar días del mes actual
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayCell = document.createElement('div');
+                dayCell.classList.add('day-cell');
+                const currentDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                dayCell.dataset.date = currentDateStr; // Guardar fecha en formato YYYY-MM-DD
+
+                let dayHtml = `<span class="day-number">${day}</span>`;
+
+                 // Buscar reuniones para este día
+                 const meetingsToday = getMeetingsForDate(currentDateStr);
+                 if (meetingsToday.length > 0) {
+                    // Opción 1: Indicador simple
+                    dayHtml += `<div class="meeting-indicator" title="${meetingsToday.length} reunión(es)"></div>`;
+
+                     // Opción 2: Mostrar nombres (limitado)
+                    // let meetingNames = meetingsToday.map(m => m.name).slice(0, 2).join(', '); // Muestra los primeros 2
+                    // if (meetingsToday.length > 2) meetingNames += '...';
+                    // dayHtml += `<div class="meetings-list-inline">${meetingNames}</div>`;
+                 }
+
+
+                dayCell.innerHTML = dayHtml;
+                dayCell.onclick = () => openModal(currentDateStr);
+                grid.appendChild(dayCell);
+            }
+
+             // Rellenar días del mes siguiente (si es necesario)
+             const totalCells = firstDayOfMonth + daysInMonth;
+             const remainingCells = (totalCells % 7 === 0) ? 0 : 7 - (totalCells % 7);
+             for (let i = 1; i <= remainingCells; i++) {
+                 const dayCell = document.createElement('div');
+                 dayCell.classList.add('day-cell', 'other-month');
+                 dayCell.innerHTML = `<span class="day-number">${i}</span>`;
+                 grid.appendChild(dayCell);
+             }
+        }
+
+        function getMeetingsForDate(dateStr) {
+             // Asegurarse de que allMeetings es un array antes de filtrar
+            if (!Array.isArray(allMeetings)) return [];
+            return allMeetings.filter(meeting => meeting.date === dateStr);
+        }
+
+        function openModal(dateStr, meetingToEdit = null) {
+            const modal = document.getElementById('meetingModal');
+            const modalTitle = document.getElementById('modal-title');
+            const meetingsList = document.getElementById('meetings-list');
+            const noMeetingsLi = document.getElementById('no-meetings');
+            const formContainer = document.getElementById('meeting-form-container');
+            const formTitle = document.getElementById('form-title');
+            const meetingForm = document.getElementById('meeting-form');
+            const dateDisplay = document.getElementById('modal-date-display');
+            const addNewBtn = document.getElementById('add-new-meeting-btn');
+
+            // Formatear fecha para mostrar
+             const dateParts = dateStr.split('-');
+             const displayDate = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
+             const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+             dateDisplay.textContent = `Fecha: ${displayDate.toLocaleDateString('es-ES', options)}`;
+
+
+            // Limpiar lista anterior
+            meetingsList.innerHTML = ''; // Vaciar la lista
+
+            const meetingsToday = getMeetingsForDate(dateStr);
+
+            if (meetingsToday.length > 0) {
+                noMeetingsLi.style.display = 'none';
+                meetingsToday.forEach(meeting => {
+                    const li = document.createElement('li');
+                    li.dataset.meetingId = meeting.id; // Guardar ID para edición/borrado
+                    li.innerHTML = `
+                        <strong>${meeting.name || 'Sin título'}</strong>
+                        <span class="meeting-responsible">Responsable(s): ${meeting.responsible || 'N/D'}</span>
+                        ${meeting.link ? `<span class="meeting-link">Enlace: <a href="${meeting.link}" target="_blank" rel="noopener noreferrer">${meeting.link}</a></span>` : ''}
+                        <div class="meeting-actions">
+                             <button onclick="editMeeting(event, '${meeting.id}')">Editar</button>
+                             <button class="delete-button" onclick="deleteMeeting(event, '${meeting.id}')">Eliminar</button>
+                        </div>
+                    `;
+                    // No hacer que el <li> completo sea clickeable para editar, usar botón
+                    // li.onclick = () => editMeeting(meeting.id); // <-- Quitado
+                    meetingsList.appendChild(li);
+                });
+            } else {
+                 meetingsList.appendChild(noMeetingsLi); // Añadir el <li> de "no hay reuniones"
+                 noMeetingsLi.style.display = 'block'; // Mostrarlo
+            }
+
+
+            // Resetear y configurar formulario
+            meetingForm.reset();
+            document.getElementById('meeting-id').value = ''; // Limpiar ID oculto
+            document.getElementById('meeting-date').value = dateStr; // Establecer fecha oculta
+
+            if (meetingToEdit) {
+                // Estamos editando
+                formTitle.textContent = "Editar Reunión";
+                document.getElementById('meeting-id').value = meetingToEdit.id;
+                document.getElementById('meeting-name').value = meetingToEdit.name;
+                document.getElementById('meeting-link').value = meetingToEdit.link || '';
+                document.getElementById('meeting-responsible').value = meetingToEdit.responsible;
+                formContainer.style.display = 'block'; // Mostrar formulario
+                addNewBtn.style.display = 'none'; // Ocultar botón "Añadir Nuevo"
+                document.getElementById('meetings-list-container').style.display = 'none'; // Ocultar lista mientras editas
+            } else {
+                 // Estamos viendo el día o añadiendo uno nuevo
+                 formTitle.textContent = "Añadir Nueva Reunión";
+                 formContainer.style.display = 'none'; // Ocultar formulario inicialmente
+                 addNewBtn.style.display = 'block'; // Mostrar botón "+ Añadir"
+                 document.getElementById('meetings-list-container').style.display = 'block'; // Mostrar lista
+            }
+
+            modal.style.display = "block";
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('meetingModal');
+            modal.style.display = "none";
+             // Resetear visibilidad de elementos internos por si acaso
+             hideForm();
+             document.getElementById('meetings-list-container').style.display = 'block';
+             document.getElementById('add-new-meeting-btn').style.display = 'block';
+        }
+
+         function showAddForm() {
+             document.getElementById('meeting-form-container').style.display = 'block';
+             document.getElementById('add-new-meeting-btn').style.display = 'none'; // Ocultar botón "+ Añadir"
+             document.getElementById('meetings-list-container').style.display = 'none'; // Ocultar lista mientras se añade
+             document.getElementById('form-title').textContent = "Añadir Nueva Reunión";
+             document.getElementById('meeting-form').reset(); // Limpiar form
+             // Asegurarse que la fecha oculta sigue correcta
+             const dateDisplay = document.getElementById('modal-date-display').textContent; // Tomar fecha del display si es necesario
+             // document.getElementById('meeting-date').value = ???; // Necesitas la fecha YYYY-MM-DD aquí
+             // La fecha ya se puso en openModal, debería estar bien
+         }
+
+         function hideForm() {
+            document.getElementById('meeting-form-container').style.display = 'none';
+            document.getElementById('meeting-form').reset();
+             document.getElementById('meeting-id').value = '';
+             // Volver a mostrar la lista y el botón + si aplica
+            const meetingsList = document.getElementById('meetings-list');
+            if (meetingsList.children.length > 0 && !(meetingsList.children.length === 1 && meetingsList.children[0].id === 'no-meetings')) {
+                document.getElementById('meetings-list-container').style.display = 'block';
+            } else if (document.getElementById('no-meetings').style.display === 'block') {
+                 document.getElementById('meetings-list-container').style.display = 'block'; // Mostrar aunque esté vacío
+            } else {
+                 document.getElementById('meetings-list-container').style.display = 'none';
+            }
+
+             document.getElementById('add-new-meeting-btn').style.display = 'block'; // Siempre mostrar botón "+" al cancelar/ocultar form
+         }
+
+        function editMeeting(event, meetingId) {
+             event.stopPropagation(); // Evita que el click se propague al li si estuviera anidado
+             const meeting = allMeetings.find(m => m.id === meetingId);
+             if (meeting) {
+                 // Reutilizamos openModal pasándole el meeting a editar
+                 openModal(meeting.date, meeting);
+             } else {
+                 console.error("No se encontró la reunión con ID:", meetingId);
+             }
+         }
+
+
+        // Manejar el envío del formulario (añadir o actualizar)
+        document.getElementById('meeting-form').addEventListener('submit', async (event) => {
+            event.preventDefault(); // Prevenir recarga de página
+
+            const meetingId = document.getElementById('meeting-id').value;
+            const isUpdating = !!meetingId; // True si hay un ID (estamos actualizando)
+
+            const meetingData = {
+                id: meetingId || Date.now().toString() + Math.random().toString(36).substr(2, 5), // Genera ID si es nuevo
+                date: document.getElementById('meeting-date').value,
+                name: document.getElementById('meeting-name').value,
+                link: document.getElementById('meeting-link').value,
+                responsible: document.getElementById('meeting-responsible').value
+            };
+
+            // Validaciones básicas (puedes añadir más)
+            if (!meetingData.date || !meetingData.name || !meetingData.responsible) {
+                alert("Por favor, completa la fecha, el tema y el responsable.");
+                return;
+            }
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST', // Usamos POST para añadir y actualizar (el PHP lo diferenciará)
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: isUpdating ? 'update' : 'add', // Acción para el PHP
+                        meeting: meetingData
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ message: 'Error desconocido' }));
+                     throw new Error(`Error del servidor: ${response.status} - ${errorData.message || 'Sin detalles'}`);
+                }
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Actualizar la lista local y la UI
+                    await fetchMeetings(); // Recargar todas las reuniones desde el servidor
+                    renderCalendar(2025, 3, 'grid-apr'); // Re-renderizar calendarios
+                    renderCalendar(2025, 4, 'grid-may');
+                    alert(`Reunión ${isUpdating ? 'actualizada' : 'añadida'} correctamente.`);
+                    // Volver a mostrar la lista del día actual en el modal
+                    openModal(meetingData.date); // Llama a openModal para refrescar la vista del día
+                } else {
+                    throw new Error(result.message || 'Error al guardar en el servidor.');
+                }
+
+            } catch (error) {
+                console.error("Error al guardar reunión:", error);
+                alert(`Error al guardar la reunión: ${error.message}`);
+            }
+        });
+
+         async function deleteMeeting(event, meetingId) {
+             event.stopPropagation(); // Previene que se active el click del LI padre si lo hubiera
+
+             if (!confirm("¿Estás seguro de que quieres eliminar esta reunión?")) {
+                 return;
+             }
+
+            try {
+                 const response = await fetch(apiUrl, {
+                     method: 'POST', // Usamos POST y una acción para eliminar
+                     headers: {
+                         'Content-Type': 'application/json',
+                     },
+                     body: JSON.stringify({
+                         action: 'delete',
+                         id: meetingId
+                     })
+                 });
+
+                 if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ message: 'Error desconocido' }));
+                    throw new Error(`Error del servidor: ${response.status} - ${errorData.message || 'Sin detalles'}`);
+                 }
+
+                 const result = await response.json();
+
+                 if (result.success) {
+                     alert("Reunión eliminada correctamente.");
+                     const deletedMeeting = allMeetings.find(m => m.id === meetingId);
+                     const dateOfDeletedMeeting = deletedMeeting ? deletedMeeting.date : null;
+
+                     await fetchMeetings(); // Recargar datos
+                     renderCalendar(2025, 3, 'grid-apr'); // Re-renderizar calendarios
+                     renderCalendar(2025, 4, 'grid-may');
+
+                     // Si teníamos una fecha, refrescar el modal para ese día
+                     if (dateOfDeletedMeeting) {
+                         openModal(dateOfDeletedMeeting);
+                     } else {
+                         closeModal(); // Si no sabemos la fecha, cerramos el modal
+                     }
+
+                 } else {
+                    throw new Error(result.message || 'Error al eliminar en el servidor.');
+                 }
+
+            } catch (error) {
+                 console.error("Error al eliminar reunión:", error);
+                 alert(`Error al eliminar la reunión: ${error.message}`);
+            }
+         }
+
+        // Cerrar modal si se hace clic fuera del contenido
+        window.onclick = function(event) {
+            const modal = document.getElementById('meetingModal');
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
+
+    </script>
+
+</body>
+</html>
