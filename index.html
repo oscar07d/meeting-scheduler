@@ -386,7 +386,7 @@
 
     <script>
         // --- JavaScript ---
-        const apiUrl = 'https://script.google.com/macros/s/AKfycbxB0rD5jTDl9oL8B1PQL_DZuN9Y8-h09JdlyS-QviKcEC8gMhAxjfwN6l0X82fS8i3m/exec'; // Nombre de tu archivo PHP
+        const apiUrl = 'https://script.google.com/macros/s/AKfycbxB0rD5jTDl9oL8B1PQL_DZuN9Y8-h09JdlyS-QviKcEC8gMhAxjfwN6l0X82fS8i3m/exec'; // TU URL DE APPS SCRIPT
         const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
         let allMeetings = []; // Almacenará todas las reuniones cargadas
 
@@ -396,42 +396,50 @@
 
         async function loadInitialData() {
             await fetchMeetings(); // Carga las reuniones primero
+            // Renderiza los calendarios DESPUÉS de cargar los datos
             renderCalendar(2025, 3, 'grid-apr'); // Abril (mes 3 porque JS es 0-indexado)
             renderCalendar(2025, 4, 'grid-may'); // Mayo (mes 4)
         }
 
         async function fetchMeetings() {
+            console.log("Fetching meetings..."); // Log para depurar carga
             try {
-                const response = await fetch(apiUrl);
+                const response = await fetch(apiUrl); // Por defecto es GET
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    // Intentar leer mensaje de error si es JSON
+                    let errorMsg = `HTTP error! status: ${response.status}`;
+                    try {
+                        const errorData = await response.json();
+                        errorMsg += ` - ${errorData.message || 'Error no especificado del script.'}`;
+                    } catch (e) { /* Ignorar si la respuesta no es JSON */ }
+                    throw new Error(errorMsg);
                 }
                 allMeetings = await response.json();
-                // Asegurarse de que sea un array
                  if (!Array.isArray(allMeetings)) {
-                     console.warn("La respuesta de la API no fue un array, inicializando a vacío:", allMeetings);
-                     allMeetings = [];
+                     console.warn("La respuesta de la API (GET) no fue un array, inicializando a vacío:", allMeetings);
+                     allMeetings = []; // Asegura que sea un array
                  }
+                 console.log("Meetings fetched successfully:", allMeetings.length);
             } catch (error) {
                 console.error("Error al cargar reuniones:", error);
                 allMeetings = []; // Asegura que sea un array en caso de error
-                alert("No se pudieron cargar las reuniones existentes. Verifica la conexión con el servidor o el archivo 'meetings.json'.");
+                alert(`No se pudieron cargar las reuniones existentes.\nError: ${error.message}\nVerifica la conexión y la URL del script.`);
             }
         }
 
         function renderCalendar(year, month, gridId) {
+            console.log(`Rendering calendar for ${year}-${month + 1}`); // Log
             const grid = document.getElementById(gridId);
-            // Limpiar grid anterior excepto los encabezados de día
+            // Limpiar grid anterior excepto los encabezados de día (los primeros 7 elementos)
             while (grid.children.length > 7) {
                  grid.removeChild(grid.lastChild);
-             }
+            }
 
-
-            const firstDayOfMonth = new Date(year, month, 1).getDay(); // 0=Dom, 1=Lun,...
+            const firstDayOfMonth = new Date(year, month, 1).getDay();
             const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-            // Rellenar días del mes anterior (si es necesario)
             const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+            // Rellenar días del mes anterior
             for (let i = 0; i < firstDayOfMonth; i++) {
                 const dayCell = document.createElement('div');
                 dayCell.classList.add('day-cell', 'other-month');
@@ -444,29 +452,40 @@
                 const dayCell = document.createElement('div');
                 dayCell.classList.add('day-cell');
                 const currentDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                dayCell.dataset.date = currentDateStr; // Guardar fecha en formato YYYY-MM-DD
+                dayCell.dataset.date = currentDateStr;
 
                 let dayHtml = `<span class="day-number">${day}</span>`;
+                const meetingsToday = getMeetingsForDate(currentDateStr);
 
-                 // Buscar reuniones para este día
-                 const meetingsToday = getMeetingsForDate(currentDateStr);
-                 if (meetingsToday.length > 0) {
-                    // Opción 1: Indicador simple
+                if (meetingsToday.length > 0) {
+                    // Indicador simple (punto rojo)
                     dayHtml += `<div class="meeting-indicator" title="${meetingsToday.length} reunión(es)"></div>`;
 
-                     // Opción 2: Mostrar nombres (limitado)
-                    // let meetingNames = meetingsToday.map(m => m.name).slice(0, 2).join(', '); // Muestra los primeros 2
-                    // if (meetingsToday.length > 2) meetingNames += '...';
-                    // dayHtml += `<div class="meetings-list-inline">${meetingNames}</div>`;
-                 }
+                    // Preview de reuniones en la celda
+                    dayHtml += `<div class="meetings-preview">`;
+                    const maxPreview = 2; // Mostrar máximo 2 previews
+                    // Ordenar reuniones por hora de inicio para mostrarlas cronológicamente
+                    meetingsToday.sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
 
+                    for(let i = 0; i < meetingsToday.length && i < maxPreview; i++) {
+                        const meeting = meetingsToday[i];
+                        const previewTime = meeting.startTime ? `${meeting.startTime}: ` : '';
+                        // Acortar nombres largos en la preview
+                        const truncatedName = meeting.name.length > 10 ? meeting.name.substring(0, 10) + '...' : meeting.name;
+                        dayHtml += `<div class="meeting-item-preview">${previewTime}${truncatedName}</div>`;
+                    }
+                    if (meetingsToday.length > maxPreview) {
+                        dayHtml += `<div class="meeting-item-preview">... (${meetingsToday.length - maxPreview} más)</div>`;
+                    }
+                    dayHtml += `</div>`;
+                }
 
                 dayCell.innerHTML = dayHtml;
                 dayCell.onclick = () => openModal(currentDateStr);
                 grid.appendChild(dayCell);
             }
 
-             // Rellenar días del mes siguiente (si es necesario)
+            // Rellenar días del mes siguiente
              const totalCells = firstDayOfMonth + daysInMonth;
              const remainingCells = (totalCells % 7 === 0) ? 0 : 7 - (totalCells % 7);
              for (let i = 1; i <= remainingCells; i++) {
@@ -475,15 +494,16 @@
                  dayCell.innerHTML = `<span class="day-number">${i}</span>`;
                  grid.appendChild(dayCell);
              }
+             console.log(`Calendar rendered for ${year}-${month + 1}`);
         }
 
         function getMeetingsForDate(dateStr) {
-             // Asegurarse de que allMeetings es un array antes de filtrar
             if (!Array.isArray(allMeetings)) return [];
             return allMeetings.filter(meeting => meeting.date === dateStr);
         }
 
         function openModal(dateStr, meetingToEdit = null) {
+            console.log(`Opening modal for date: ${dateStr}`, meetingToEdit ? `Editing meeting ID: ${meetingToEdit.id}` : 'Adding new meeting');
             const modal = document.getElementById('meetingModal');
             const modalTitle = document.getElementById('modal-title');
             const meetingsList = document.getElementById('meetings-list');
@@ -495,24 +515,46 @@
             const addNewBtn = document.getElementById('add-new-meeting-btn');
 
             // Formatear fecha para mostrar
-             const dateParts = dateStr.split('-');
-             const displayDate = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
-             const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-             dateDisplay.textContent = `Fecha: ${displayDate.toLocaleDateString('es-ES', options)}`;
+            try {
+                 const dateParts = dateStr.split('-');
+                 const displayDate = new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2])); // Usar UTC para evitar problemas de zona horaria
+                 const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' };
+                 dateDisplay.textContent = `Fecha: ${displayDate.toLocaleDateString('es-ES', options)}`;
+            } catch (e) {
+                 console.error("Error formatting date:", e);
+                 dateDisplay.textContent = `Fecha: ${dateStr}`; // Fallback
+            }
 
 
             // Limpiar lista anterior
-            meetingsList.innerHTML = ''; // Vaciar la lista
+            meetingsList.innerHTML = '';
+            // Asegurarse que el <li> de 'no reuniones' esté presente si se necesita
+             if (!document.getElementById('no-meetings')) {
+                 const li = document.createElement('li');
+                 li.id = 'no-meetings';
+                 li.style.display = 'none';
+                 li.style.fontStyle = 'italic';
+                 li.style.color = '#888';
+                 li.style.border = 'none';
+                 li.textContent = 'No hay reuniones para este día.';
+                 meetingsList.appendChild(li);
+             } else {
+                 document.getElementById('no-meetings').style.display = 'none'; // Ocultarlo por defecto
+             }
 
             const meetingsToday = getMeetingsForDate(dateStr);
+            // Ordenar por hora de inicio para la lista
+             meetingsToday.sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
 
             if (meetingsToday.length > 0) {
-                noMeetingsLi.style.display = 'none';
                 meetingsToday.forEach(meeting => {
                     const li = document.createElement('li');
-                    li.dataset.meetingId = meeting.id; // Guardar ID para edición/borrado
+                    li.dataset.meetingId = meeting.id;
+                    const displayTime = (meeting.startTime && meeting.endTime)
+                                      ? `${meeting.startTime} - ${meeting.endTime}: `
+                                      : '';
                     li.innerHTML = `
-                        <strong>${meeting.name || 'Sin título'}</strong>
+                        <strong>${displayTime}${meeting.name || 'Sin título'}</strong>
                         <span class="meeting-responsible">Responsable(s): ${meeting.responsible || 'N/D'}</span>
                         ${meeting.link ? `<span class="meeting-link">Enlace: <a href="${meeting.link}" target="_blank" rel="noopener noreferrer">${meeting.link}</a></span>` : ''}
                         <div class="meeting-actions">
@@ -520,37 +562,37 @@
                              <button class="delete-button" onclick="deleteMeeting(event, '${meeting.id}')">Eliminar</button>
                         </div>
                     `;
-                    // No hacer que el <li> completo sea clickeable para editar, usar botón
-                    // li.onclick = () => editMeeting(meeting.id); // <-- Quitado
                     meetingsList.appendChild(li);
                 });
             } else {
-                 meetingsList.appendChild(noMeetingsLi); // Añadir el <li> de "no hay reuniones"
-                 noMeetingsLi.style.display = 'block'; // Mostrarlo
+                 document.getElementById('no-meetings').style.display = 'block'; // Mostrar si no hay reuniones
             }
-
 
             // Resetear y configurar formulario
             meetingForm.reset();
-            document.getElementById('meeting-id').value = ''; // Limpiar ID oculto
-            document.getElementById('meeting-date').value = dateStr; // Establecer fecha oculta
+            document.getElementById('meeting-id').value = '';
+            document.getElementById('meeting-date').value = dateStr;
 
             if (meetingToEdit) {
                 // Estamos editando
                 formTitle.textContent = "Editar Reunión";
                 document.getElementById('meeting-id').value = meetingToEdit.id;
-                document.getElementById('meeting-name').value = meetingToEdit.name;
+                document.getElementById('meeting-name').value = meetingToEdit.name || '';
                 document.getElementById('meeting-link').value = meetingToEdit.link || '';
-                document.getElementById('meeting-responsible').value = meetingToEdit.responsible;
-                formContainer.style.display = 'block'; // Mostrar formulario
-                addNewBtn.style.display = 'none'; // Ocultar botón "Añadir Nuevo"
-                document.getElementById('meetings-list-container').style.display = 'none'; // Ocultar lista mientras editas
+                document.getElementById('meeting-responsible').value = meetingToEdit.responsible || '';
+                // --- Rellenar horas ---
+                document.getElementById('meeting-start-time').value = meetingToEdit.startTime || '';
+                document.getElementById('meeting-end-time').value = meetingToEdit.endTime || '';
+                // --- Fin rellenar horas ---
+                formContainer.style.display = 'block';
+                addNewBtn.style.display = 'none';
+                document.getElementById('meetings-list-container').style.display = 'none';
             } else {
                  // Estamos viendo el día o añadiendo uno nuevo
                  formTitle.textContent = "Añadir Nueva Reunión";
-                 formContainer.style.display = 'none'; // Ocultar formulario inicialmente
-                 addNewBtn.style.display = 'block'; // Mostrar botón "+ Añadir"
-                 document.getElementById('meetings-list-container').style.display = 'block'; // Mostrar lista
+                 formContainer.style.display = 'none';
+                 addNewBtn.style.display = 'block';
+                 document.getElementById('meetings-list-container').style.display = 'block';
             }
 
             modal.style.display = "block";
@@ -559,162 +601,197 @@
         function closeModal() {
             const modal = document.getElementById('meetingModal');
             modal.style.display = "none";
-             // Resetear visibilidad de elementos internos por si acaso
-             hideForm();
+             hideForm(); // Asegura que el form se oculte
+             // Restaura visibilidad por defecto al cerrar
              document.getElementById('meetings-list-container').style.display = 'block';
              document.getElementById('add-new-meeting-btn').style.display = 'block';
         }
 
-         function showAddForm() {
+        function showAddForm() {
              document.getElementById('meeting-form-container').style.display = 'block';
-             document.getElementById('add-new-meeting-btn').style.display = 'none'; // Ocultar botón "+ Añadir"
-             document.getElementById('meetings-list-container').style.display = 'none'; // Ocultar lista mientras se añade
+             document.getElementById('add-new-meeting-btn').style.display = 'none';
+             document.getElementById('meetings-list-container').style.display = 'none';
              document.getElementById('form-title').textContent = "Añadir Nueva Reunión";
-             document.getElementById('meeting-form').reset(); // Limpiar form
-             // Asegurarse que la fecha oculta sigue correcta
-             const dateDisplay = document.getElementById('modal-date-display').textContent; // Tomar fecha del display si es necesario
-             // document.getElementById('meeting-date').value = ???; // Necesitas la fecha YYYY-MM-DD aquí
-             // La fecha ya se puso en openModal, debería estar bien
-         }
+             document.getElementById('meeting-form').reset(); // Limpiar form al mostrarlo para añadir
+             document.getElementById('meeting-id').value = ''; // Asegurarse que no hay ID
+             // La fecha oculta (#meeting-date) debería mantenerse desde openModal
+        }
 
-         function hideForm() {
+        function hideForm() {
             document.getElementById('meeting-form-container').style.display = 'none';
             document.getElementById('meeting-form').reset();
              document.getElementById('meeting-id').value = '';
-             // Volver a mostrar la lista y el botón + si aplica
-            const meetingsList = document.getElementById('meetings-list');
-            if (meetingsList.children.length > 0 && !(meetingsList.children.length === 1 && meetingsList.children[0].id === 'no-meetings')) {
-                document.getElementById('meetings-list-container').style.display = 'block';
-            } else if (document.getElementById('no-meetings').style.display === 'block') {
-                 document.getElementById('meetings-list-container').style.display = 'block'; // Mostrar aunque esté vacío
-            } else {
-                 document.getElementById('meetings-list-container').style.display = 'none';
-            }
-
-             document.getElementById('add-new-meeting-btn').style.display = 'block'; // Siempre mostrar botón "+" al cancelar/ocultar form
-         }
+             // Mostrar lista y botón "+" al ocultar/cancelar
+             document.getElementById('meetings-list-container').style.display = 'block';
+             document.getElementById('add-new-meeting-btn').style.display = 'block';
+        }
 
         function editMeeting(event, meetingId) {
-             event.stopPropagation(); // Evita que el click se propague al li si estuviera anidado
-             const meeting = allMeetings.find(m => m.id === meetingId);
+             event.stopPropagation();
+             console.log(`Attempting to edit meeting ID: ${meetingId}`);
+             // Busca en la versión más reciente de las reuniones
+             const meeting = allMeetings.find(m => m.id != null && m.id.toString() === meetingId.toString());
              if (meeting) {
-                 // Reutilizamos openModal pasándole el meeting a editar
-                 openModal(meeting.date, meeting);
+                 openModal(meeting.date, meeting); // Llama a openModal con datos para editar
              } else {
-                 console.error("No se encontró la reunión con ID:", meetingId);
+                 console.error("No se encontró la reunión con ID:", meetingId, "en la lista actual:", allMeetings);
+                  alert("Error: No se encontró la reunión para editar. Intenta recargar la página.");
              }
          }
 
-
         // Manejar el envío del formulario (añadir o actualizar)
         document.getElementById('meeting-form').addEventListener('submit', async (event) => {
-            event.preventDefault(); // Prevenir recarga de página
+            event.preventDefault();
+            console.log("Form submitted.");
 
             const meetingId = document.getElementById('meeting-id').value;
-            const isUpdating = !!meetingId; // True si hay un ID (estamos actualizando)
+            const isUpdating = !!meetingId;
+            console.log(isUpdating ? `Updating meeting ID: ${meetingId}` : "Adding new meeting");
 
-            const meetingData = {
-                id: meetingId || Date.now().toString() + Math.random().toString(36).substr(2, 5), // Genera ID si es nuevo
-                date: document.getElementById('meeting-date').value,
-                name: document.getElementById('meeting-name').value,
-                link: document.getElementById('meeting-link').value,
-                responsible: document.getElementById('meeting-responsible').value
-            };
+            // --- Obtener valores, incluyendo horas ---
+            const startTime = document.getElementById('meeting-start-time').value;
+            const endTime = document.getElementById('meeting-end-time').value;
+            const meetingDate = document.getElementById('meeting-date').value;
+            const meetingName = document.getElementById('meeting-name').value;
+            const meetingLink = document.getElementById('meeting-link').value;
+            const meetingResponsible = document.getElementById('meeting-responsible').value;
 
-            // Validaciones básicas (puedes añadir más)
-            if (!meetingData.date || !meetingData.name || !meetingData.responsible) {
-                alert("Por favor, completa la fecha, el tema y el responsable.");
+            // --- Validación ---
+            if (!startTime || !endTime) {
+                alert("Por favor, selecciona hora de inicio y fin.");
                 return;
             }
+            // Comparación simple de strings HH:mm funciona bien aquí
+            if (endTime <= startTime) {
+                 alert("La hora de fin debe ser posterior a la hora de inicio.");
+                 return;
+            }
+             if (!meetingDate || !meetingName || !meetingResponsible) {
+                 alert("Por favor, completa la fecha, el tema y el responsable.");
+                 return;
+            }
 
-try {
-    const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-            // 'Content-Type': 'application/json', // <-- LÍNEA ANTERIOR
-            'Content-Type': 'text/plain;charset=utf-8', // <-- ¡NUEVA LÍNEA!
-        },
-        // El body sigue siendo JSON stringificado, ¡eso está bien!
-        body: JSON.stringify({
-            action: isUpdating ? 'update' : 'add',
-            meeting: meetingData
-        })
-    });
+            // --- Crear objeto meetingData ---
+            const meetingData = {
+                id: meetingId || Date.now().toString() + Math.random().toString(36).substr(2, 5), // Genera ID si es nuevo
+                date: meetingDate,
+                name: meetingName,
+                link: meetingLink,
+                responsible: meetingResponsible,
+                startTime: startTime,
+                endTime: endTime
+            };
+            console.log("Data to send:", meetingData);
+
+            // --- Enviar al Apps Script ---
+            try {
+                console.log("Sending fetch request to API...");
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'text/plain;charset=utf-8', // Usar text/plain para evitar problemas CORS
+                    },
+                    body: JSON.stringify({ // El cuerpo sigue siendo JSON
+                        action: isUpdating ? 'update' : 'add',
+                        meeting: meetingData
+                    })
+                });
+                console.log("Fetch response status:", response.status);
+
+                // Intentar parsear JSON incluso si !response.ok para obtener mensaje de error del script
+                 const result = await response.json();
+                 console.log("API Response:", result);
+
 
                 if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({ message: 'Error desconocido' }));
-                     throw new Error(`Error del servidor: ${response.status} - ${errorData.message || 'Sin detalles'}`);
+                     // Usar el mensaje del script si está disponible
+                    const errorMessage = result?.message || `Error del servidor: ${response.status} - Sin detalles adicionales.`;
+                    throw new Error(errorMessage);
                 }
 
-                const result = await response.json();
 
-                if (result.success) {
-                    // Actualizar la lista local y la UI
-                    await fetchMeetings(); // Recargar todas las reuniones desde el servidor
-                    renderCalendar(2025, 3, 'grid-apr'); // Re-renderizar calendarios
-                    renderCalendar(2025, 4, 'grid-may');
+                // --- Éxito ---
+                 if (result.success) {
+                    console.log(`Meeting ${isUpdating ? 'updated' : 'added'} successfully.`);
                     alert(`Reunión ${isUpdating ? 'actualizada' : 'añadida'} correctamente.`);
-                    // Volver a mostrar la lista del día actual en el modal
-                    openModal(meetingData.date); // Llama a openModal para refrescar la vista del día
+
+                    // Actualizar la lista local y la UI inmediatamente
+                    await fetchMeetings(); // Recargar *todos* los datos del backend
+                    // Re-renderizar *ambos* calendarios para que se actualice la vista
+                    renderCalendar(2025, 3, 'grid-apr');
+                    renderCalendar(2025, 4, 'grid-may');
+                    // Volver a mostrar el modal para el día actual, ahora con la lista actualizada
+                    openModal(meetingData.date);
+
                 } else {
-                    throw new Error(result.message || 'Error al guardar en el servidor.');
+                     // Si success es false, pero la respuesta fue ok (raro, pero posible)
+                     throw new Error(result.message || 'Error desconocido al guardar en el servidor.');
                 }
 
             } catch (error) {
-                console.error("Error al guardar reunión:", error);
-                alert(`Error al guardar la reunión: ${error.message}`);
+                console.error("Error during save/update fetch:", error);
+                // Mostrar el mensaje de error capturado
+                alert(`Error al guardar la reunión:\n${error.message}`);
             }
         });
 
          async function deleteMeeting(event, meetingId) {
-             event.stopPropagation(); // Previene que se active el click del LI padre si lo hubiera
+             event.stopPropagation();
+             console.log(`Attempting to delete meeting ID: ${meetingId}`);
 
              if (!confirm("¿Estás seguro de que quieres eliminar esta reunión?")) {
+                 console.log("Deletion cancelled by user.");
                  return;
              }
 
             try {
                  const response = await fetch(apiUrl, {
-                     method: 'POST', // Usamos POST y una acción para eliminar
+                     method: 'POST',
                      headers: {
-                         'Content-Type': 'application/json',
+                         // Usar text/plain también para delete por consistencia y evitar CORS
+                          'Content-Type': 'text/plain;charset=utf-8',
                      },
                      body: JSON.stringify({
                          action: 'delete',
                          id: meetingId
                      })
                  });
+                console.log("Delete response status:", response.status);
+
+                const result = await response.json();
+                console.log("Delete API Response:", result);
 
                  if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({ message: 'Error desconocido' }));
-                    throw new Error(`Error del servidor: ${response.status} - ${errorData.message || 'Sin detalles'}`);
+                     const errorMessage = result?.message || `Error del servidor: ${response.status} - Sin detalles adicionales.`;
+                     throw new Error(errorMessage);
                  }
 
-                 const result = await response.json();
-
                  if (result.success) {
+                     console.log("Meeting deleted successfully.");
                      alert("Reunión eliminada correctamente.");
-                     const deletedMeeting = allMeetings.find(m => m.id === meetingId);
-                     const dateOfDeletedMeeting = deletedMeeting ? deletedMeeting.date : null;
+
+                     // Encuentra la fecha antes de recargar para poder reabrir el modal
+                      const deletedMeeting = allMeetings.find(m => m.id != null && m.id.toString() === meetingId.toString());
+                      const dateOfDeletedMeeting = deletedMeeting ? deletedMeeting.date : null;
 
                      await fetchMeetings(); // Recargar datos
                      renderCalendar(2025, 3, 'grid-apr'); // Re-renderizar calendarios
                      renderCalendar(2025, 4, 'grid-may');
 
-                     // Si teníamos una fecha, refrescar el modal para ese día
+                     // Refrescar el modal del día afectado o cerrar si no se sabe cuál era
                      if (dateOfDeletedMeeting) {
                          openModal(dateOfDeletedMeeting);
                      } else {
-                         closeModal(); // Si no sabemos la fecha, cerramos el modal
+                         closeModal();
                      }
 
                  } else {
-                    throw new Error(result.message || 'Error al eliminar en el servidor.');
+                     throw new Error(result.message || 'Error al eliminar en el servidor.');
                  }
 
             } catch (error) {
-                 console.error("Error al eliminar reunión:", error);
-                 alert(`Error al eliminar la reunión: ${error.message}`);
+                 console.error("Error during delete fetch:", error);
+                 alert(`Error al eliminar la reunión:\n${error.message}`);
             }
          }
 
