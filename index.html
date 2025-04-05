@@ -379,11 +379,6 @@
     </div>
 
     <script>
-        Logger.log("Trabajando con Spreadsheet: " + SpreadsheetApp.getActiveSpreadsheet().getName() + " (ID: " + SpreadsheetApp.getActiveSpreadsheet().getId() + ")");
-const SHEET_NAME = "TuNombreDeHojaExacto"; // Asegúrate que esta línea siga aquí
-Logger.log("Intentando obtener hoja llamada: " + SHEET_NAME);
-const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
-Logger.log("Resultado de getSheetByName: " + sheet); // <-- ¡Este log es clave!
         // --- JavaScript ---
         const apiUrl = 'https://script.google.com/macros/s/AKfycbxB0rD5jTDl9oL8B1PQL_DZuN9Y8-h09JdlyS-QviKcEC8gMhAxjfwN6l0X82fS8i3m/exec'; // Nombre de tu archivo PHP
         const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
