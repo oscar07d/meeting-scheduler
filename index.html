@@ -356,19 +356,25 @@
             <div id="meeting-form-container" style="display: none; margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px;">
                 <h4 id="form-title">Añadir/Editar Reunión</h4>
                 <form id="meeting-form">
-                    <input type="hidden" id="meeting-id"> <!-- Para saber si estamos editando -->
-                    <input type="hidden" id="meeting-date">
-
-                    <label for="meeting-name">Tema de la Reunión:</label>
-                    <input type="text" id="meeting-name" name="name" required>
-
-                    <label for="meeting-link">Enlace de la Reunión (Opcional):</label>
-                    <input type="url" id="meeting-link" name="link">
-
-                    <label for="meeting-responsible">Responsable(s) (separados por coma):</label>
-                    <input type="text" id="meeting-responsible" name="responsible" required>
-                    <!-- O podrías usar un <textarea> si prefieres -->
-                    <!-- <textarea id="meeting-responsible" name="responsible" required></textarea> -->
+                   <label for="meeting-name">Tema de la Reunión:</label>
+                   <input type="text" id="meeting-name" name="name" required>
+                
+                   <label for="meeting-link">Enlace de la Reunión (Opcional):</label>
+                   <input type="url" id="meeting-link" name="link">
+                
+                   <label for="meeting-responsible">Responsable(s) (separados por coma):</label>
+                   <input type="text" id="meeting-responsible" name="responsible" required>
+                   <!-- O si usas textarea: -->
+                   <!-- <textarea id="meeting-responsible" name="responsible" required></textarea> -->
+                
+                   <!-- ****** AQUÍ PEGAS EL CÓDIGO NUEVO ****** -->
+                   <label for="meeting-start-time">Hora Inicio:</label>
+                   <input type="time" id="meeting-start-time" name="startTime" required>
+                
+                   <label for="meeting-end-time">Hora Fin:</label>
+                   <input type="time" id="meeting-end-time" name="endTime" required>
+                   <!-- ****** FIN DEL CÓDIGO NUEVO ****** -->
+                    
 
 
                     <button type="submit">Guardar Reunión</button>
